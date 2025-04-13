@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, X, Moon, Sun } from "lucide-react"
+import { Menu, X, Moon, Sun, Building2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
@@ -35,20 +35,7 @@ export default function Header() {
           <div className="flex items-center">
             <Link href="/" className="flex items-center">
               <div className="bg-blue-600 text-white p-1.5 rounded-md mr-2">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-5 w-5"
-                >
-                  <path d="M18 21v-7a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v7" />
-                  <rect width="20" height="5" x="2" y="3" rx="2" />
-                  <path d="M12 12v9" />
-                </svg>
+                <Building2 className="h-5 w-5" />
               </div>
               <span className="font-bold text-xl text-gray-900 dark:text-white">Co.Info</span>
             </Link>

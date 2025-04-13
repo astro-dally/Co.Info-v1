@@ -24,7 +24,7 @@ export default async function CompanyPage({ params }: { params: { symbol: string
           <Suspense
             fallback={
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
-                <LoadingSpinner text={`Loading ${symbol} company profile...`} size={32} />
+                <LoadingSpinner text={`Loading company profile...`} size={32} />
               </div>
             }
           >
@@ -45,7 +45,7 @@ export default async function CompanyPage({ params }: { params: { symbol: string
             <Suspense
               fallback={
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
-                  <LoadingSpinner text="Loading financial data..." />
+                  <LoadingSpinner text="Loading company details..." />
                 </div>
               }
             >
@@ -66,7 +66,7 @@ async function CompanySummaryWrapper({ symbol }: { symbol: string }) {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 flex justify-center">
         <ErrorMessage
           title="Company not found"
-          description={`We couldn't find information for ${symbol}. Please check the symbol and try again.`}
+          description={`We couldn't find information for this company. Please try another search.`}
         />
       </div>
     )
@@ -77,11 +77,13 @@ async function CompanySummaryWrapper({ symbol }: { symbol: string }) {
 
 async function CompanyNewsWrapper({ symbol }: { symbol: string }) {
   const newsData = await getCompanyNews(symbol)
+  const companyData = await getCompanyProfile(symbol)
+  const companyName = companyData?.name || symbol
 
   if (!newsData || newsData.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 flex justify-center">
-        <ErrorMessage title="No news available" description={`We couldn't find any recent news for ${symbol}.`} />
+        <ErrorMessage title="No news available" description={`We couldn't find any recent news for ${companyName}.`} />
       </div>
     )
   }
@@ -91,17 +93,18 @@ async function CompanyNewsWrapper({ symbol }: { symbol: string }) {
 
 async function CompanyFinancialsWrapper({ symbol }: { symbol: string }) {
   const financialsData = await getCompanyFinancials(symbol)
+  const companyData = await getCompanyProfile(symbol)
 
-  if (!financialsData) {
+  if (!financialsData || !companyData) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 flex justify-center">
         <ErrorMessage
-          title="Financial data unavailable"
-          description={`We couldn't retrieve financial data for ${symbol}.`}
+          title="Company details unavailable"
+          description={`We couldn't retrieve additional details for this company.`}
         />
       </div>
     )
   }
 
-  return <CompanyFinancials financials={financialsData} />
+  return <CompanyFinancials financials={financialsData} company={companyData} />
 }

@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { Search, TrendingUp, X } from "lucide-react"
+import { Search, Building2, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { searchCompanies } from "@/lib/api"
@@ -17,14 +17,14 @@ export default function SearchBar() {
   const [results, setResults] = useState<CompanySearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [showResults, setShowResults] = useState(false)
-  const [trendingStocks, setTrendingStocks] = useState<string[]>([
-    "AAPL",
-    "MSFT",
-    "GOOGL",
-    "AMZN",
-    "META",
-    "TSLA",
-    "NVDA",
+  const [popularCompanies, setPopularCompanies] = useState<string[]>([
+    "Apple",
+    "Microsoft",
+    "Google",
+    "Amazon",
+    "Meta",
+    "Tesla",
+    "NVIDIA",
   ])
   const searchRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
@@ -94,7 +94,7 @@ export default function SearchBar() {
           </div>
           <Input
             type="text"
-            placeholder="Search for a company or ticker symbol..."
+            placeholder="Search for a company by name..."
             className="pl-10 pr-12 py-6 w-full rounded-xl border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
             value={query}
             onChange={(e) => {
@@ -130,19 +130,22 @@ export default function SearchBar() {
           {query.length < 2 ? (
             <div className="p-4">
               <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center mb-3">
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Trending Companies
+                <Building2 className="h-4 w-4 mr-2" />
+                Popular Companies
               </h3>
               <div className="flex flex-wrap gap-2">
-                {trendingStocks.map((symbol) => (
+                {popularCompanies.map((company) => (
                   <Button
-                    key={symbol}
+                    key={company}
                     variant="outline"
                     size="sm"
-                    onClick={() => handleSearch(symbol)}
+                    onClick={() => {
+                      setQuery(company)
+                      setShowResults(true)
+                    }}
                     className="text-sm"
                   >
-                    {symbol}
+                    {company}
                   </Button>
                 ))}
               </div>
@@ -160,14 +163,14 @@ export default function SearchBar() {
                   onClick={() => handleSearch(company.symbol)}
                 >
                   <div className="flex items-center">
-                    <div className="bg-gray-100 dark:bg-gray-700 rounded-md p-2 mr-3">
-                      <span className="font-mono text-sm font-semibold text-blue-600 dark:text-blue-400">
-                        {company.symbol}
-                      </span>
+                    <div className="bg-blue-100 dark:bg-blue-900/30 rounded-md p-2 mr-3">
+                      <Building2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
                       <div className="font-medium text-gray-900 dark:text-gray-100">{company.name}</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">{company.exchange}</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        {company.exchange} • {company.symbol}
+                      </div>
                     </div>
                   </div>
                 </li>

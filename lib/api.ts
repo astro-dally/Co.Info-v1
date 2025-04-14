@@ -1,55 +1,85 @@
-import type { CompanySearchResult, CompanyProfile, NewsArticle, CompanyFinancials } from "./types"
+import type {
+  CompanySearchResult,
+  CompanyProfile,
+  NewsArticle,
+  CompanyFinancials,
+} from "./types";
+// Add a new caching utility at the top of the file
+import { getCachedData, setCachedData } from "./utils/api-helpers";
 
 // API Keys from environment variables
-const FINANCIAL_API_KEY = process.env.FINANCIAL_API_KEY || "demo"
-const NEWS_API_KEY = process.env.NEWS_API_KEY || ""
+const FINANCIAL_API_KEY = process.env.FINANCIAL_API_KEY || "demo";
+const NEWS_API_KEY = process.env.NEWS_API_KEY || "";
 
-// Search companies using Financial Modeling Prep API
-export async function searchCompanies(query: string): Promise<CompanySearchResult[]> {
-  if (query.length < 2) return []
+// Modify the searchCompanies function to implement caching
+export async function searchCompanies(
+  query: string
+): Promise<CompanySearchResult[]> {
+  if (query.length < 2) return [];
+
+  // Check cache first
+  const cacheKey = `search_${query.toLowerCase()}`;
+  const cachedResults = getCachedData<CompanySearchResult[]>(cacheKey);
+  if (cachedResults) {
+    return cachedResults;
+  }
 
   try {
     // Real API call to Financial Modeling Prep
     const response = await fetch(
-      `https://financialmodelingprep.com/api/v3/search?query=${encodeURIComponent(query)}&limit=10&apikey=${FINANCIAL_API_KEY}`,
-      { next: { revalidate: 3600 } }, // Cache for 1 hour
-    )
+      `https://financialmodelingprep.com/api/v3/search?query=${encodeURIComponent(
+        query
+      )}&limit=10&apikey=${FINANCIAL_API_KEY}`,
+      { next: { revalidate: 3600 } } // Cache for 1 hour
+    );
 
-    if (!response.ok) throw new Error("API request failed")
+    if (!response.ok) throw new Error("API request failed");
 
-    const data = await response.json()
+    const data = await response.json();
 
-    return data.map((item: any) => ({
+    const results = data.map((item: any) => ({
       symbol: item.symbol,
       name: item.name,
       exchange: item.exchangeShortName || item.exchange || "Unknown",
       type: item.type || "stock",
-    }))
+    }));
+
+    // Cache the results
+    setCachedData(cacheKey, results);
+    return results;
   } catch (error) {
-    console.error("Error fetching company search results:", error)
+    console.error("Error fetching company search results:", error);
     // Fallback to mock data
-    return getMockSearchResults(query)
+    return getMockSearchResults(query);
   }
 }
 
-// Get company profile using Financial Modeling Prep API
-export async function getCompanyProfile(symbol: string): Promise<CompanyProfile | null> {
+// Modify the getCompanyProfile function to implement caching
+export async function getCompanyProfile(
+  symbol: string
+): Promise<CompanyProfile | null> {
+  // Check cache first
+  const cacheKey = `profile_${symbol.toUpperCase()}`;
+  const cachedProfile = getCachedData<CompanyProfile>(cacheKey);
+  if (cachedProfile) {
+    return cachedProfile;
+  }
+
   try {
     // Real API call to Financial Modeling Prep
     const response = await fetch(
       `https://financialmodelingprep.com/api/v3/profile/${symbol}?apikey=${FINANCIAL_API_KEY}`,
-      { next: { revalidate: 86400 } }, // Cache for 24 hours
-    )
+      { next: { revalidate: 86400 } } // Cache for 24 hours
+    );
 
-    if (!response.ok) throw new Error("API request failed")
+    if (!response.ok) throw new Error("API request failed");
 
-    const data = await response.json()
+    const data = await response.json();
 
-    if (!data || data.length === 0) throw new Error("No company data found")
+    if (!data || data.length === 0) throw new Error("No company data found");
 
-    const company = data[0]
-
-    return {
+    const company = data[0];
+    const profile = {
       symbol: company.symbol,
       name: company.companyName,
       price: company.price,
@@ -66,36 +96,49 @@ export async function getCompanyProfile(symbol: string): Promise<CompanyProfile 
       fullTimeEmployees: company.fullTimeEmployees,
       image: company.image || "/placeholder.svg?height=100&width=100",
       ipoDate: company.ipoDate,
-    }
+    };
+
+    // Cache the profile
+    setCachedData(cacheKey, profile);
+    return profile;
   } catch (error) {
-    console.error("Error fetching company profile:", error)
+    console.error("Error fetching company profile:", error);
     // Fallback to mock data
-    return getMockCompanyProfile(symbol)
+    return getMockCompanyProfile(symbol);
   }
 }
 
-// Get company news using News API
+// Modify the getCompanyNews function to implement caching
 export async function getCompanyNews(symbol: string): Promise<NewsArticle[]> {
+  // Check cache first
+  const cacheKey = `news_${symbol.toUpperCase()}`;
+  const cachedNews = getCachedData<NewsArticle[]>(cacheKey);
+  if (cachedNews) {
+    return cachedNews;
+  }
+
   try {
     // Get company name from profile for better news search
-    const companyProfile = await getCompanyProfile(symbol)
-    const companyName = companyProfile?.name.split(" ")[0] || symbol
+    const companyProfile = await getCompanyProfile(symbol);
+    const companyName = companyProfile?.name.split(" ")[0] || symbol;
 
     // Use News API with the provided API key
     const response = await fetch(
-      `https://newsapi.org/v2/everything?q=${encodeURIComponent(companyName)}&sortBy=publishedAt&pageSize=5&apiKey=${NEWS_API_KEY}`,
-      { next: { revalidate: 3600 } }, // Cache for 1 hour
-    )
+      `https://newsapi.org/v2/everything?q=${encodeURIComponent(
+        companyName
+      )}&sortBy=publishedAt&pageSize=5&apiKey=${NEWS_API_KEY}`,
+      { next: { revalidate: 3600 } } // Cache for 1 hour
+    );
 
-    if (!response.ok) throw new Error("API request failed")
+    if (!response.ok) throw new Error("API request failed");
 
-    const data = await response.json()
+    const data = await response.json();
 
     if (!data.articles || data.articles.length === 0) {
-      throw new Error("No news articles found")
+      throw new Error("No news articles found");
     }
 
-    return data.articles.map((article: any) => ({
+    const news = data.articles.map((article: any) => ({
       source: {
         id: article.source.id,
         name: article.source.name,
@@ -107,38 +150,59 @@ export async function getCompanyNews(symbol: string): Promise<NewsArticle[]> {
       urlToImage: article.urlToImage || "/placeholder.svg?height=200&width=300",
       publishedAt: article.publishedAt,
       content: article.content || "",
-    }))
+    }));
+
+    // Cache the news
+    setCachedData(cacheKey, news);
+    return news;
   } catch (error) {
-    console.error("Error fetching company news:", error)
+    console.error("Error fetching company news:", error);
     // Fallback to mock data
-    return getMockNewsData(symbol)
+    return getMockNewsData(symbol);
   }
 }
 
-// Get company financials using Financial Modeling Prep API
-export async function getCompanyFinancials(symbol: string): Promise<CompanyFinancials | null> {
+// Modify the getCompanyFinancials function to implement caching
+export async function getCompanyFinancials(
+  symbol: string
+): Promise<CompanyFinancials | null> {
+  // Check cache first
+  const cacheKey = `financials_${symbol.toUpperCase()}`;
+  const cachedFinancials = getCachedData<CompanyFinancials>(cacheKey);
+  if (cachedFinancials) {
+    return cachedFinancials;
+  }
+
   try {
     // Real API calls to Financial Modeling Prep
     const [quoteResponse, ratiosResponse] = await Promise.all([
-      fetch(`https://financialmodelingprep.com/api/v3/quote/${symbol}?apikey=${FINANCIAL_API_KEY}`, {
-        next: { revalidate: 3600 },
-      }), // Cache for 1 hour
-      fetch(`https://financialmodelingprep.com/api/v3/ratios/${symbol}?limit=1&apikey=${FINANCIAL_API_KEY}`, {
-        next: { revalidate: 86400 },
-      }), // Cache for 24 hours
-    ])
+      fetch(
+        `https://financialmodelingprep.com/api/v3/quote/${symbol}?apikey=${FINANCIAL_API_KEY}`,
+        {
+          next: { revalidate: 3600 },
+        }
+      ), // Cache for 1 hour
+      fetch(
+        `https://financialmodelingprep.com/api/v3/ratios/${symbol}?limit=1&apikey=${FINANCIAL_API_KEY}`,
+        {
+          next: { revalidate: 86400 },
+        }
+      ), // Cache for 24 hours
+    ]);
 
-    if (!quoteResponse.ok || !ratiosResponse.ok) throw new Error("API request failed")
+    if (!quoteResponse.ok || !ratiosResponse.ok)
+      throw new Error("API request failed");
 
-    const quoteData = await quoteResponse.json()
-    const ratiosData = await ratiosResponse.json()
+    const quoteData = await quoteResponse.json();
+    const ratiosData = await ratiosResponse.json();
 
-    if (!quoteData || quoteData.length === 0) throw new Error("No quote data found")
+    if (!quoteData || quoteData.length === 0)
+      throw new Error("No quote data found");
 
-    const quote = quoteData[0]
-    const ratios = ratiosData[0] || {}
+    const quote = quoteData[0];
+    const ratios = ratiosData[0] || {};
 
-    return {
+    const financials = {
       symbol: quote.symbol,
       marketCap: quote.marketCap,
       pe: quote.pe,
@@ -148,14 +212,19 @@ export async function getCompanyFinancials(symbol: string): Promise<CompanyFinan
       yearLow: quote.yearLow,
       avgVolume: quote.avgVolume,
       priceToBookRatio: ratios.priceToBookRatio || quote.priceToBookRatio || 0,
-      priceToSalesRatio: ratios.priceToSalesRatio || quote.priceToSalesRatio || 0,
+      priceToSalesRatio:
+        ratios.priceToSalesRatio || quote.priceToSalesRatio || 0,
       dividendYield: (quote.dividendYield || 0) / 100,
       debtToEquity: ratios.debtToEquity || 0,
-    }
+    };
+
+    // Cache the financials
+    setCachedData(cacheKey, financials);
+    return financials;
   } catch (error) {
-    console.error("Error fetching company financials:", error)
+    console.error("Error fetching company financials:", error);
     // Fallback to mock data
-    return getMockFinancialsData(symbol)
+    return getMockFinancialsData(symbol);
   }
 }
 
@@ -163,32 +232,99 @@ export async function getCompanyFinancials(symbol: string): Promise<CompanyFinan
 function getMockSearchResults(query: string): CompanySearchResult[] {
   const mockCompanies = [
     { symbol: "AAPL", name: "Apple Inc.", exchange: "NASDAQ", type: "stock" },
-    { symbol: "MSFT", name: "Microsoft Corporation", exchange: "NASDAQ", type: "stock" },
-    { symbol: "GOOGL", name: "Alphabet Inc.", exchange: "NASDAQ", type: "stock" },
-    { symbol: "AMZN", name: "Amazon.com Inc.", exchange: "NASDAQ", type: "stock" },
-    { symbol: "META", name: "Meta Platforms Inc.", exchange: "NASDAQ", type: "stock" },
+    {
+      symbol: "MSFT",
+      name: "Microsoft Corporation",
+      exchange: "NASDAQ",
+      type: "stock",
+    },
+    {
+      symbol: "GOOGL",
+      name: "Alphabet Inc.",
+      exchange: "NASDAQ",
+      type: "stock",
+    },
+    {
+      symbol: "AMZN",
+      name: "Amazon.com Inc.",
+      exchange: "NASDAQ",
+      type: "stock",
+    },
+    {
+      symbol: "META",
+      name: "Meta Platforms Inc.",
+      exchange: "NASDAQ",
+      type: "stock",
+    },
     { symbol: "TSLA", name: "Tesla Inc.", exchange: "NASDAQ", type: "stock" },
-    { symbol: "NVDA", name: "NVIDIA Corporation", exchange: "NASDAQ", type: "stock" },
-    { symbol: "JPM", name: "JPMorgan Chase & Co.", exchange: "NYSE", type: "stock" },
+    {
+      symbol: "NVDA",
+      name: "NVIDIA Corporation",
+      exchange: "NASDAQ",
+      type: "stock",
+    },
+    {
+      symbol: "JPM",
+      name: "JPMorgan Chase & Co.",
+      exchange: "NYSE",
+      type: "stock",
+    },
     { symbol: "V", name: "Visa Inc.", exchange: "NYSE", type: "stock" },
     { symbol: "WMT", name: "Walmart Inc.", exchange: "NYSE", type: "stock" },
-    { symbol: "JNJ", name: "Johnson & Johnson", exchange: "NYSE", type: "stock" },
-    { symbol: "PG", name: "Procter & Gamble Co.", exchange: "NYSE", type: "stock" },
+    {
+      symbol: "JNJ",
+      name: "Johnson & Johnson",
+      exchange: "NYSE",
+      type: "stock",
+    },
+    {
+      symbol: "PG",
+      name: "Procter & Gamble Co.",
+      exchange: "NYSE",
+      type: "stock",
+    },
     { symbol: "MA", name: "Mastercard Inc.", exchange: "NYSE", type: "stock" },
-    { symbol: "UNH", name: "UnitedHealth Group Inc.", exchange: "NYSE", type: "stock" },
+    {
+      symbol: "UNH",
+      name: "UnitedHealth Group Inc.",
+      exchange: "NYSE",
+      type: "stock",
+    },
     { symbol: "HD", name: "Home Depot Inc.", exchange: "NYSE", type: "stock" },
-    { symbol: "INTC", name: "Intel Corporation", exchange: "NASDAQ", type: "stock" },
-    { symbol: "DIS", name: "The Walt Disney Company", exchange: "NYSE", type: "stock" },
-    { symbol: "NFLX", name: "Netflix, Inc.", exchange: "NASDAQ", type: "stock" },
-    { symbol: "CSCO", name: "Cisco Systems, Inc.", exchange: "NASDAQ", type: "stock" },
+    {
+      symbol: "INTC",
+      name: "Intel Corporation",
+      exchange: "NASDAQ",
+      type: "stock",
+    },
+    {
+      symbol: "DIS",
+      name: "The Walt Disney Company",
+      exchange: "NYSE",
+      type: "stock",
+    },
+    {
+      symbol: "NFLX",
+      name: "Netflix, Inc.",
+      exchange: "NASDAQ",
+      type: "stock",
+    },
+    {
+      symbol: "CSCO",
+      name: "Cisco Systems, Inc.",
+      exchange: "NASDAQ",
+      type: "stock",
+    },
     { symbol: "ADBE", name: "Adobe Inc.", exchange: "NASDAQ", type: "stock" },
-  ]
+  ];
 
   // Filter the mock companies based on the query (case insensitive)
-  const lowerQuery = query.toLowerCase()
+  const lowerQuery = query.toLowerCase();
   return mockCompanies.filter(
-    (company) => company.symbol.toLowerCase().includes(lowerQuery) || company.name.toLowerCase().includes(lowerQuery),
-  )
+    (company) =>
+      company.symbol.toLowerCase().includes(lowerQuery) ||
+      company.name.toLowerCase().includes(lowerQuery)
+  );
 }
 
 function getMockCompanyProfile(symbol: string): CompanyProfile {
@@ -337,7 +473,7 @@ function getMockCompanyProfile(symbol: string): CompanyProfile {
       ipoDate: "1957-11-12",
       fullTimeEmployees: 195000,
     },
-  }
+  };
 
   // Default mock profile for any symbol not in our mock data
   const defaultProfile: CompanyProfile = {
@@ -357,17 +493,17 @@ function getMockCompanyProfile(symbol: string): CompanyProfile {
     image: "/placeholder.svg?height=100&width=100",
     ipoDate: "2000-01-01",
     fullTimeEmployees: 10000,
-  }
+  };
 
   return {
     ...defaultProfile,
     ...mockProfiles[symbol],
     symbol,
-  } as CompanyProfile
+  } as CompanyProfile;
 }
 
 function getMockNewsData(symbol: string): NewsArticle[] {
-  const companyName = getMockCompanyProfile(symbol).name.split(" ")[0]
+  const companyName = getMockCompanyProfile(symbol).name.split(" ")[0];
 
   return [
     {
@@ -420,7 +556,7 @@ function getMockNewsData(symbol: string): NewsArticle[] {
       publishedAt: new Date(Date.now() - 345600000).toISOString(),
       content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit...",
     },
-  ]
+  ];
 }
 
 function getMockFinancialsData(symbol: string): CompanyFinancials {
@@ -524,7 +660,7 @@ function getMockFinancialsData(symbol: string): CompanyFinancials {
       dividendYield: 0.0,
       debtToEquity: 0.49,
     },
-  }
+  };
 
   // Return specific financial profile if available, otherwise return default
   return (
@@ -542,5 +678,5 @@ function getMockFinancialsData(symbol: string): CompanyFinancials {
       dividendYield: 0.015,
       debtToEquity: 0.45,
     }
-  )
+  );
 }
